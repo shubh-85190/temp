@@ -173,10 +173,10 @@
         <h2>Sender Image</h2>
         <p class="subtitle">This image is uploaded by other person</p>
         <div class="img-wrapper" id="sender-img-container">
-            <span style="color: var(--text-muted); font-size:14px;">Fetching live image...</span>
+            <span style="color: var(--text-muted); font-size:14px;">Fetching live stream...</span>
         </div>
         <div id="sender-timestamp-container"></div>
-        <button onclick="location.reload()" class="btn-secondary">Log-Out</button>
+        <button onclick="location.reload()" class="btn-secondary" style="margin-top: 15px;">Log-Out</button>
     </div>
 
     <!-- 4. MY DATA UPDATE HUB -->
@@ -184,21 +184,33 @@
         <h2>My Image</h2>
         <p class="subtitle">Currently this image is showing to the other person</p>
         <div class="img-wrapper" id="mydata-img-container">
-            <span style="color: var(--text-muted); font-size:14px;">Fetching live image...</span>
+            <span style="color: var(--text-muted); font-size:14px;">Fetching live stream...</span>
         </div>
         <div id="mydata-timestamp-container"></div>
         
         <hr>
         
-        <div class="file-drop-area">
-            <span id="file-label">Take Photo with Camera</span>
-            <!-- Direct access to mobile camera device -->
-            <input type="file" id="file-uploader" accept="image/*" capture="environment" onchange="updateFileLabel()">
+        <!-- Inline Canvas Camera Block preventing background low-memory crashes -->
+        <div id="camera-box" class="hidden">
+            <video id="camera-stream" autoplay playsinline style="width: 100%; border-radius: 16px; background: #000; margin-bottom: 12px;"></video>
+            <button onclick="takeInlineSnapshot()" style="background-color: var(--success);">Capture Picture</button>
+            <button onclick="stopInlineCamera()" class="btn-secondary">Cancel Camera</button>
         </div>
-        <button onclick="uploadImage()">Upload</button>
+
+        <!-- System Controls -->
+        <div id="upload-controls">
+            <button onclick="startInlineCamera()" style="background-color: var(--accent-primary); margin-bottom: 12px;">📸 Take Photo Instantly</button>
+            
+            <div class="file-drop-area">
+                <span id="file-label">Or select image file from gallery</span>
+                <input type="file" id="file-uploader" accept="image/*" onchange="updateFileLabel()">
+            </div>
+            <button onclick="uploadImage()">Upload Selected File</button>
+        </div>
+
         <p id="upload-status" class="status-msg"></p>
         
-        <button onclick="location.reload()" class="btn-secondary">Log-Out</button>
+        <button onclick="location.reload()" class="btn-secondary" style="margin-top: 15px;">Log-Out</button>
     </div>
 
     <script>
@@ -211,9 +223,11 @@
         const TOKEN_PART_2 = "Lt4x13yPFxU1nz17frg40rNnOFbrQPZnnlkdJcWJHGKV6M7Rml3sFx6E"; 
         const HARDCODED_TOKEN = TOKEN_PART_1 + TOKEN_PART_2;
 
-        // Runtime variables determined directly from PIN entry
+        // Runtime global states tracking filenames
         let myImageFile = "";
         let senderImageFile = "";
+        let activeStream = null;
+        let capturedBlob = null;
 
         window.onload = () => { document.getElementById('pin-input').value = ""; };
 
@@ -221,8 +235,9 @@
             const input = document.getElementById('file-uploader');
             const label = document.getElementById('file-label');
             if(input.files.length > 0) {
-                label.innerText = "Captured: " + input.files[0].name;
+                label.innerText = "Picked: " + input.files[0].name;
                 label.style.color = "var(--success)";
+                capturedBlob = null; // Clear camera snapshot if gallery image is selected
             }
         }
 
@@ -252,10 +267,63 @@
             }, 150);
         }
 
+        // Inline HTML5 Native Camera Stream Activation Control
+        async function startInlineCamera() {
+            document.getElementById('upload-controls').classList.add('hidden');
+            document.getElementById('camera-box').classList.remove('hidden');
+            document.getElementById('upload-status').innerText = "";
+            capturedBlob = null;
+
+            try {
+                activeStream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: "environment" },
+                    audio: false
+                });
+                const videoElement = document.getElementById('camera-stream');
+                videoElement.srcObject = activeStream;
+            } catch (err) {
+                console.error("Camera access failure:", err);
+                alert("Could not start inline camera. Please fallback to file picker.");
+                stopInlineCamera();
+            }
+        }
+
+        function stopInlineCamera() {
+            if (activeStream) {
+                activeStream.getTracks().forEach(track => track.stop());
+            }
+            document.getElementById('camera-box').classList.add('hidden');
+            document.getElementById('upload-controls').classList.remove('hidden');
+        }
+
+        function takeInlineSnapshot() {
+            const video = document.getElementById('camera-stream');
+            const canvas = document.createElement('canvas');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            
+            // Compresses image to high performance JPEG at 85% to optimize memory sizes
+            canvas.toBlob((blob) => {
+                capturedBlob = blob;
+                
+                const previewUrl = URL.createObjectURL(blob);
+                document.getElementById('mydata-img-container').innerHTML = `<img src="${previewUrl}" alt="Captured Preview">`;
+                
+                const label = document.getElementById('file-label');
+                label.innerText = "Camera Snapshot Ready for Upload";
+                label.style.color = "var(--success)";
+                
+                stopInlineCamera();
+            }, 'image/jpeg', 0.85);
+        }
+
         // Queries GitHub commits for accurate file modification timestamps
         async function fetchFileTimestamp(targetFile, elementId) {
             try {
-                const response = await fetch(`https://api.github.com/repos/${GITHUB_USERNAME}/${REPO_NAME}/commits?path=${targetFile}&per_page=1`);
+                const response = await fetch(`https://api.github.com/repos/${GITHUB_USERNAME}/${REPO_NAME}/commits?path=${targetFile}&per_page=1&nocache=${Date.now()}`);
                 if (response.ok) {
                     const commits = await response.json();
                     if (commits.length > 0) {
@@ -271,10 +339,10 @@
             }
         }
 
-        // Bypasses deployment delays by fetching raw repository file objects instantly
+        // Bypasses deployment delays by fetching raw repository file streams instantly
         async function fetchInstantImage(targetFile, containerId) {
             try {
-                const response = await fetch(`https://api.github.com/repos/${GITHUB_USERNAME}/${REPO_NAME}/contents/${targetFile}`, {
+                const response = await fetch(`https://api.github.com/repos/${GITHUB_USERNAME}/${REPO_NAME}/contents/${targetFile}?nocache=${Date.now()}`, {
                     headers: {
                         "Authorization": `token ${HARDCODED_TOKEN}`,
                         "Accept": "application/vnd.github.v3.raw"
@@ -286,10 +354,10 @@
                     const objectURL = URL.createObjectURL(blob);
                     document.getElementById(containerId).innerHTML = `<img src="${objectURL}" alt="Live Asset Stream">`;
                 } else {
-                    document.getElementById(containerId).innerHTML = `<span style="color: var(--error); font-size:14px;">Asset reference initialization error. Please capture and upload an initial image.</span>`;
+                    document.getElementById(containerId).innerHTML = `<span style="color: var(--text-muted); font-size:14px;">Asset not configured yet in your repository root.</span>`;
                 }
             } catch (err) {
-                console.error("Instant fetch execution error:", err);
+                console.error("Instant image acquisition error:", err);
                 document.getElementById(containerId).innerHTML = `<span style="color: var(--error); font-size:14px;">Pipeline connectivity error.</span>`;
             }
         }
@@ -310,58 +378,71 @@
             const fileInput = document.getElementById('file-uploader');
             const statusText = document.getElementById('upload-status');
 
-            if (fileInput.files.length === 0) { alert("Select or capture an image first."); return; }
+            const hasFile = fileInput.files.length > 0;
+            const hasBlob = capturedBlob !== null;
+
+            if (!hasFile && !hasBlob) { alert("Select a gallery image or snap a picture first."); return; }
 
             statusText.className = "status-msg";
             statusText.style.color = "var(--text-main)";
             statusText.innerText = "Encoding capture data streams...";
-            
-            const file = fileInput.files[0];
-            const reader = new FileReader();
-            reader.readAsDataURL(file);
-            reader.onload = async () => {
-                const base64Content = reader.result.split(',')[1];
-                
-                try {
-                    statusText.innerText = "Verifying repository asset hash...";
-                    let sha = "";
-                    const getFileResponse = await fetch(`https://api.github.com/repos/${GITHUB_USERNAME}/${REPO_NAME}/contents/${myImageFile}`);
+
+            const processUpload = async (fileOrBlob) => {
+                const reader = new FileReader();
+                reader.readAsDataURL(fileOrBlob);
+                reader.onload = async () => {
+                    const base64Content = reader.result.split(',')[1];
                     
-                    if (getFileResponse.ok) {
-                        const fileData = await getFileResponse.json();
-                        sha = fileData.sha;
-                    }
+                    try {
+                        statusText.innerText = "Fetching latest repository file signatures...";
+                        let sha = "";
+                        const getFileResponse = await fetch(`https://api.github.com/repos/${GITHUB_USERNAME}/${REPO_NAME}/contents/${myImageFile}?nocache=${Date.now()}`, {
+                            headers: { "Authorization": `token ${HARDCODED_TOKEN}` }
+                        });
+                        
+                        if (getFileResponse.ok) {
+                            const fileData = await getFileResponse.json();
+                            sha = fileData.sha;
+                        }
 
-                    statusText.innerText = "Syncing camera pipeline with GitHub repository...";
-                    const uploadResponse = await fetch(`https://api.github.com/repos/${GITHUB_USERNAME}/${REPO_NAME}/contents/${myImageFile}`, {
-                        method: "PUT",
-                        headers: {
-                            "Authorization": `token ${HARDCODED_TOKEN}`,
-                            "Accept": "application/vnd.github.v3+json",
-                            "Content-Type": "application/json"
-                        },
-                        body: JSON.stringify({
+                        statusText.innerText = "Syncing update pipeline directly with GitHub repository...";
+                        const payload = {
                             message: `Dynamic Overwrite Profile: ${myImageFile} at ${new Date().toISOString()}`,
-                            content: base64Content,
-                            sha: sha
-                        })
-                    });
+                            content: base64Content
+                        };
+                        if (sha) payload.sha = sha;
 
-                    if (uploadResponse.ok) {
-                        statusText.className = "status-msg status-success";
-                        statusText.innerText = "Write pipeline success! Synchronizing stream views...";
-                        setTimeout(() => { location.reload(); }, 2000);
-                    } else {
-                        const errData = await uploadResponse.json();
+                        const uploadResponse = await fetch(`https://api.github.com/repos/${GITHUB_USERNAME}/${REPO_NAME}/contents/${myImageFile}`, {
+                            method: "PUT",
+                            headers: {
+                                "Authorization": `token ${HARDCODED_TOKEN}`,
+                                "Accept": "application/vnd.github.v3+json",
+                                "Content-Type": "application/json"
+                            },
+                            body: JSON.stringify(payload)
+                        });
+
+                        if (uploadResponse.ok) {
+                            statusText.className = "status-msg status-success";
+                            statusText.innerText = "Upload successful! Synchronizing stream views...";
+                            setTimeout(() => { location.reload(); }, 2000);
+                        } else {
+                            const errData = await uploadResponse.json();
+                            statusText.className = "status-msg status-error";
+                            statusText.innerText = `Pipeline fault: ${errData.message}`;
+                        }
+                    } catch (error) {
                         statusText.className = "status-msg status-error";
-                        statusText.innerText = `Pipeline fault: ${errData.message}`;
+                        statusText.innerText = `Exception Event: ${error.message}`;
                     }
-
-                } catch (error) {
-                    statusText.className = "status-msg status-error";
-                    statusText.innerText = `Exception Event: ${error.message}`;
-                }
+                };
             };
+
+            if (hasBlob) {
+                await processUpload(capturedBlob);
+            } else {
+                await processUpload(fileInput.files[0]);
+            }
         }
     </script>
 </body>
