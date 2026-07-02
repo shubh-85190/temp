@@ -173,7 +173,7 @@
         <h2>Sender Image</h2>
         <p class="subtitle">This image is uploaded by other person</p>
         <div class="img-wrapper" id="sender-img-container">
-            <span style="color: var(--text-muted); font-size:14px;">Fetching image...</span>
+            <span style="color: var(--text-muted); font-size:14px;">Fetching live image...</span>
         </div>
         <div id="sender-timestamp-container"></div>
         <button onclick="location.reload()" class="btn-secondary">Log-Out</button>
@@ -184,15 +184,15 @@
         <h2>My Image</h2>
         <p class="subtitle">Currently this image is showing to the other person</p>
         <div class="img-wrapper" id="mydata-img-container">
-            <span style="color: var(--text-muted); font-size:14px;">Fetching image...</span>
+            <span style="color: var(--text-muted); font-size:14px;">Fetching live image...</span>
         </div>
         <div id="mydata-timestamp-container"></div>
         
         <hr>
         
         <div class="file-drop-area">
-            <span id="file-label">Click to Capture Image via Camera</span>
-            <!-- Added capture="environment" to directly wake up device rear camera -->
+            <span id="file-label">Take Photo with Camera</span>
+            <!-- Direct access to mobile camera device -->
             <input type="file" id="file-uploader" accept="image/*" capture="environment" onchange="updateFileLabel()">
         </div>
         <button onclick="uploadImage()">Upload</button>
@@ -252,7 +252,7 @@
             }, 150);
         }
 
-        // Helper to query GitHub commits for exact file update timestamps
+        // Queries GitHub commits for accurate file modification timestamps
         async function fetchFileTimestamp(targetFile, elementId) {
             try {
                 const response = await fetch(`https://api.github.com/repos/${GITHUB_USERNAME}/${REPO_NAME}/commits?path=${targetFile}&per_page=1`);
@@ -260,7 +260,6 @@
                     const commits = await response.json();
                     if (commits.length > 0) {
                         const rawDate = new Date(commits[0].commit.committer.date);
-                        // Clean, readable local presentation formatting
                         const localTimeStr = rawDate.toLocaleString([], { hour: '2-digit', minute: '2-digit', day: '2-digit', month: 'short' });
                         document.getElementById(elementId).innerHTML = `<span class="timestamp-badge">Updated: ${localTimeStr}</span>`;
                         return;
@@ -272,21 +271,37 @@
             }
         }
 
-        function showView(view) {
-            const timestamp = Date.now();
-            const baseUrl = `https://` + GITHUB_USERNAME + `.github.io/` + REPO_NAME;
+        // Bypasses deployment delays by fetching raw repository file objects instantly
+        async function fetchInstantImage(targetFile, containerId) {
+            try {
+                const response = await fetch(`https://api.github.com/repos/${GITHUB_USERNAME}/${REPO_NAME}/contents/${targetFile}`, {
+                    headers: {
+                        "Authorization": `token ${HARDCODED_TOKEN}`,
+                        "Accept": "application/vnd.github.v3.raw"
+                    }
+                });
 
+                if (response.ok) {
+                    const blob = await response.blob();
+                    const objectURL = URL.createObjectURL(blob);
+                    document.getElementById(containerId).innerHTML = `<img src="${objectURL}" alt="Live Asset Stream">`;
+                } else {
+                    document.getElementById(containerId).innerHTML = `<span style="color: var(--error); font-size:14px;">Asset reference initialization error. Please capture and upload an initial image.</span>`;
+                }
+            } catch (err) {
+                console.error("Instant fetch execution error:", err);
+                document.getElementById(containerId).innerHTML = `<span style="color: var(--error); font-size:14px;">Pipeline connectivity error.</span>`;
+            }
+        }
+
+        function showView(view) {
             if (view === 'sender') {
                 transitionCard('menu-screen', 'sender-view');
-                const targetUrl = `${baseUrl}/${senderImageFile}?t=${timestamp}`;
-                document.getElementById('sender-img-container').innerHTML = `<img src="${targetUrl}" alt="Sender Image Context">`;
-                // Read commit history log tracking when the sender updated their file
+                fetchInstantImage(senderImageFile, 'sender-img-container');
                 fetchFileTimestamp(senderImageFile, 'sender-timestamp-container');
             } else if (view === 'mydata') {
                 transitionCard('menu-screen', 'mydata-view');
-                const targetUrl = `${baseUrl}/${myImageFile}?t=${timestamp}`;
-                document.getElementById('mydata-img-container').innerHTML = `<img src="${targetUrl}" alt="My Current Image Profile">`;
-                // Read commit history log tracking when you last updated your file
+                fetchInstantImage(myImageFile, 'mydata-img-container');
                 fetchFileTimestamp(myImageFile, 'mydata-timestamp-container');
             }
         }
