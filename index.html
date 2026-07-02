@@ -237,18 +237,21 @@
             }, 150);
         }
 
-        function showView(view) {
-            const timestamp = Date.now();
-            if (view === 'sender') {
-                transitionCard('menu-screen', 'sender-view');
-                const targetUrl = `https://raw.githubusercontent.com/${GITHUB_USERNAME}/${REPO_NAME}/main/${senderImageFile}?t=${timestamp}`;
-                document.getElementById('sender-img-container').innerHTML = `<img src="${targetUrl}" alt="Sender Image Context">`;
-            } else if (view === 'mydata') {
-                transitionCard('menu-screen', 'mydata-view');
-                const targetUrl = `https://raw.githubusercontent.com/${GITHUB_USERNAME}/${REPO_NAME}/main/${myImageFile}?t=${timestamp}`;
-                document.getElementById('mydata-img-container').innerHTML = `<img src="${targetUrl}" alt="My Current Image Profile">`;
-            }
-        }
+      function showView(view) {
+    const timestamp = Date.now();
+    // Use your GitHub Pages domain path instead of raw.githubusercontent
+    const baseUrl = `https://${GITHUB_USERNAME}.github.io/${REPO_NAME}`;
+
+    if (view === 'sender') {
+        transitionCard('menu-screen', 'sender-view');
+        const targetUrl = `${baseUrl}/${senderImageFile}?t=${timestamp}`;
+        document.getElementById('sender-img-container').innerHTML = `<img src="${targetUrl}" alt="Sender Image Context">`;
+    } else if (view === 'mydata') {
+        transitionCard('menu-screen', 'mydata-view');
+        const targetUrl = `${baseUrl}/${myImageFile}?t=${timestamp}`;
+        document.getElementById('mydata-img-container').innerHTML = `<img src="${targetUrl}" alt="My Current Image Profile">`;
+    }
+}
 
         async function uploadImage() {
             const fileInput = document.getElementById('file-uploader');
