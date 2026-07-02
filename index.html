@@ -268,7 +268,7 @@
         }
 
         // Inline HTML5 Native Camera Stream Activation Control
-        async function startInlineCamera() {
+async function startInlineCamera() {
             document.getElementById('upload-controls').classList.add('hidden');
             document.getElementById('camera-box').classList.remove('hidden');
             document.getElementById('upload-status').innerText = "";
@@ -276,7 +276,7 @@
 
             try {
                 activeStream = await navigator.mediaDevices.getUserMedia({
-                    video: { facingMode: "environment" },
+                    video: { facingMode: "user" }, // Changed to "user" for the front camera
                     audio: false
                 });
                 const videoElement = document.getElementById('camera-stream');
