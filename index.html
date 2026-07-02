@@ -136,12 +136,12 @@
 
     <!-- 1. PIN SCREEN -->
     <div id="login-screen" class="card">
-        <h2>Enter Access Key</h2>
+        <h2>Enter Login Pin</h2>
         <p class="subtitle">Please provide your 5-digit security code</p>
         <div class="input-group">
             <input type="password" id="pin-input" maxlength="5" autocomplete="off" placeholder="•••••">
         </div>
-        <button onclick="checkPin()">Verify Connection</button>
+        <button onclick="checkPin()">Login</button>
         <p id="login-error" class="status-msg status-error hidden">Invalid authorization credential.</p>
     </div>
 
@@ -150,40 +150,40 @@
         <h2>Secure Terminal</h2>
         <p class="subtitle">Choose a datastream portal context</p>
         <div class="menu-grid">
-            <button id="btn-sender" onclick="showView('sender')">Open Sender View</button>
-            <button id="btn-mydata" onclick="showView('mydata')">Manage My Data</button>
-            <button onclick="location.reload()" class="btn-secondary">Terminate Session</button>
+            <button id="btn-sender" onclick="showView('sender')">View Image</button>
+            <button id="btn-mydata" onclick="showView('mydata')">Upload Image</button>
+            <button onclick="location.reload()" class="btn-secondary">Log-Out</button>
         </div>
     </div>
 
     <!-- 3. SENDER VIEW PORTAL -->
     <div id="sender-view" class="card hidden">
-        <h2>Sender Stream</h2>
-        <p class="subtitle">Incoming asset configuration</p>
+        <h2>Sender Image</h2>
+        <p class="subtitle">This image is uploaded by other person</p>
         <div class="img-wrapper" id="sender-img-container">
-            <span style="color: var(--text-muted); font-size:14px;">Initializing payload lookup...</span>
+            <span style="color: var(--text-muted); font-size:14px;">Fetching image...</span>
         </div>
-        <button onclick="location.reload()" class="btn-secondary">Return to Lobby</button>
+        <button onclick="location.reload()" class="btn-secondary">Log-Out/button>
     </div>
 
     <!-- 4. MY DATA UPDATE HUB -->
     <div id="mydata-view" class="card hidden">
-        <h2>My Repository</h2>
-        <p class="subtitle">Currently deployed file configuration</p>
+        <h2>My Image</h2>
+        <p class="subtitle">Currently this image is showing to the other person</p>
         <div class="img-wrapper" id="mydata-img-container">
-            <span style="color: var(--text-muted); font-size:14px;">Initializing payload lookup...</span>
+            <span style="color: var(--text-muted); font-size:14px;">Fetching image...</span>
         </div>
         
         <hr>
         
         <div class="file-drop-area">
-            <span id="file-label">Select fresh target image</span>
+            <span id="file-label">Upload new image</span>
             <input type="file" id="file-uploader" accept="image/*" onchange="updateFileLabel()">
         </div>
-        <button onclick="uploadImage()">Commit & Overwrite Asset</button>
+        <button onclick="uploadImage()">Upload</button>
         <p id="upload-status" class="status-msg"></p>
         
-        <button onclick="location.reload()" class="btn-secondary">Return to Lobby</button>
+        <button onclick="location.reload()" class="btn-secondary">Log-Out</button>
     </div>
 
     <script>
