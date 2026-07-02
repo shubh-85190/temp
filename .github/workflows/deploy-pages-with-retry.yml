@@ -1,0 +1,72 @@
+name: Deploy GitHub Pages with Retry
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+
+      - name: Build with Jekyll
+        uses: actions/jekyll-build-pages@v1
+        with:
+          source: ./
+          destination: ./_site
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages (Attempt 1)
+        id: deployment-1
+        continue-on-error: true
+        uses: actions/deploy-pages@v4
+
+      - name: Deploy to GitHub Pages (Attempt 2)
+        id: deployment-2
+        if: steps.deployment-1.outcome == 'failure'
+        continue-on-error: true
+        uses: actions/deploy-pages@v4
+
+      - name: Deploy to GitHub Pages (Attempt 3)
+        id: deployment-3
+        if: steps.deployment-2.outcome == 'failure'
+        uses: actions/deploy-pages@v4
+
+      - name: Set deployment output
+        id: deployment
+        run: |
+          if [ "${{ steps.deployment-1.outcome }}" = "success" ]; then
+            echo "Deployment succeeded on attempt 1"
+          elif [ "${{ steps.deployment-2.outcome }}" = "success" ]; then
+            echo "Deployment succeeded on attempt 2"
+          elif [ "${{ steps.deployment-3.outcome }}" = "success" ]; then
+            echo "Deployment succeeded on attempt 3"
+          else
+            echo "Deployment failed after 3 attempts"
+            exit 1
+          fi
